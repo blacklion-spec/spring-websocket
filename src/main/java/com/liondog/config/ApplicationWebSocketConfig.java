@@ -11,6 +11,7 @@ import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
+import org.springframework.web.socket.server.standard.ServletServerContainerFactoryBean;
 import org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor;
 
 import java.util.Map;
@@ -19,6 +20,13 @@ import java.util.Map;
 @EnableWebSocket
 @Slf4j
 public class ApplicationWebSocketConfig implements WebSocketConfigurer {
+
+    @Bean
+    public ServletServerContainerFactoryBean createWevSocketContainer() {
+        ServletServerContainerFactoryBean container = new ServletServerContainerFactoryBean();
+        container.setMaxSessionIdleTimeout(5000L); //会话空闲超时是直接关闭连接
+        return container;
+    }
 
 
     @Override
@@ -40,11 +48,12 @@ public class ApplicationWebSocketConfig implements WebSocketConfigurer {
     public class MyHandler extends TextWebSocketHandler {
 
         /**
-         * 处理心跳数据，这是收到了pingMessage的回调方法吧？
+         * 处理心跳数据
+         * 服务端主动发送PingMessage，客户端回复了PongMessage后，会回调此方法
          */
         @Override
         protected void handlePongMessage(WebSocketSession session, PongMessage message) throws Exception {
-
+            log.info("接受到心跳回复 : " + message);
         }
 
         //在WebSocket协商成功并且WebSocket连接打开并准备使用之后调用。
@@ -58,6 +67,8 @@ public class ApplicationWebSocketConfig implements WebSocketConfigurer {
         protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
             System.out.println(message.getPayload());
             session.sendMessage(new TextMessage("12121"));
+            session.sendMessage(new PingMessage());
+
         }
 
         /**
@@ -76,6 +87,12 @@ public class ApplicationWebSocketConfig implements WebSocketConfigurer {
         public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
             session.close(CloseStatus.SERVER_ERROR);
             log.error("websocket通信异常：" + exception.getMessage());
+        }
+
+
+        @Override
+        public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+            log.debug("连接关闭：" + status.getCode() + "原因：" + status.getReason());
         }
     }
 
