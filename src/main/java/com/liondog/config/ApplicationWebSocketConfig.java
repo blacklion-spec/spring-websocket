@@ -1,53 +1,100 @@
 package com.liondog.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketHandler;
-import org.springframework.web.socket.WebSocketSession;
+import org.springframework.http.server.ServerHttpRequest;
+import org.springframework.http.server.ServerHttpResponse;
+import org.springframework.web.socket.*;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import org.springframework.web.socket.server.HandshakeInterceptor;
 import org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor;
 
-/**
- * @author marui
- * @version 1.0.0
- * @ClassName ApplicationWebSocketConfig.java
- * @Description
- * @createTime 2022年07月29日 00:13:00
- */
+import java.util.Map;
+
 @Configuration
 @EnableWebSocket
+@Slf4j
 public class ApplicationWebSocketConfig implements WebSocketConfigurer {
 
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(myHandler(),"/websocketTest").addInterceptors(new HttpSessionHandshakeInterceptor()).setAllowedOrigins("*");
+        //HttpSessionHandshakeInterceptor的作用是将HttpSession中的属性传递给attributes（Map）中，包括sessionId，还有放在session中的属性
+        registry.addHandler(myHandler(), "/webSocketTest").addInterceptors(new HttpSessionHandshakeInterceptor(),myHandshakeInterceptor()).setAllowedOrigins("*");
     }
 
     @Bean
     public WebSocketHandler myHandler() {
-        return  new MyHandler();
+        return new MyHandler();
+    }
+
+    @Bean
+    public HandshakeInterceptor myHandshakeInterceptor() {
+        return new MyHandshakeInterceptor();
     }
 
     public class MyHandler extends TextWebSocketHandler {
 
+        /**
+         * 处理心跳数据，这是收到了pingMessage的回调方法吧？
+         */
         @Override
-        public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-            super.afterConnectionEstablished(session);
+        protected void handlePongMessage(WebSocketSession session, PongMessage message) throws Exception {
+
         }
 
+        //在WebSocket协商成功并且WebSocket连接打开并准备使用之后调用。
+        @Override
+        public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+            log.debug("连接可用 ： " + session.getId());
+        }
+
+        //处理文本类消息
         @Override
         protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
             System.out.println(message.getPayload());
+            session.sendMessage(new TextMessage("12121"));
+        }
+
+        /**
+         * WebSocketHandler是否处理部分消息。
+         * 如果该标志设置为true并且底层的WebSocket服务器支持部分消息，
+         * 那么一个大的WebSocket消息，或者一个未知大小的消息可能会被分割，
+         * 并可能通过多次调用handleMessage(WebSocketSession, WebSocketMessage)来接收。
+         * 标志WebSocketMessage.isLast()指示消息是否是部分的，是否为最后一部分。
+         */
+        @Override
+        public boolean supportsPartialMessages() {
+            return false;
         }
 
         @Override
-        public boolean supportsPartialMessages() {
-            return super.supportsPartialMessages();
+        public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
+            session.close(CloseStatus.SERVER_ERROR);
+            log.error("websocket通信异常：" + exception.getMessage());
+        }
+    }
+
+    public class MyHandshakeInterceptor implements HandshakeInterceptor {
+
+        /*
+            在处理握手之前调用。
+            参数: 请求-当前请求 响应-当前响应 目标WebSocket处理程序 attribute—HTTP握手中与WebSocket会话相关联的属性;复制提供的属性，不使用原始映射。
+            返回: 是继续握手(true)还是中止握手(false)
+         */
+        @Override
+        public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler, Map<String, Object> attributes) throws Exception {
+            log.debug("握手之前");
+            return true;
+        }
+
+        @Override
+        public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler, Exception exception) {
+            log.debug("握手之后");
         }
     }
 

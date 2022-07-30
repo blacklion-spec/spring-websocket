@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <h1>xxx</h1>
+</body>
+<script type="text/javascript">
+    var ws = new WebSocket("ws://localhost:9000/webSocketTest");
+    ws.onopen = function(){
+        //当WebSocket创建成功时，触发onopen事件
+        console.log("open");
+        ws.send("客户端消息"); //将消息发送到服务端
+    };
+    ws.onmessage = function(e){
+        //当客户端收到服务端发来的消息时，触发onmessage事件，参数e.data包含server传递过来的数据
+        console.log("接收到消息" + e.data);
+    }
+</script>
+</html>
